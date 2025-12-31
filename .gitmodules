@@ -1,0 +1,3 @@
+[submodule "UWrMaxSat"]
+	path = UWrMaxSat
+	url = git@github.com:marekpiotrow/UWrMaxSat.git
