@@ -1,0 +1,100 @@
+name: Cross-platform build
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  linux:
+    name: Linux (Ubuntu)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential clang pkg-config libgmp-dev zlib1g-dev
+      - name: Install Rust nightly
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          profile: minimal
+      - name: Build crate
+        run: cargo build --locked
+
+  macos:
+    name: macOS 13
+    runs-on: macos-13
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install build dependencies
+        run: |
+          brew list gmp >/dev/null 2>&1 || brew install gmp
+      - name: Install Rust nightly
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          profile: minimal
+      - name: Build crate
+        run: cargo build --locked
+
+  windows:
+    name: Windows (MSYS2)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Prepare MSYS2 toolchain
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            base-devel
+            git
+            mingw-w64-ucrt-x86_64-toolchain
+            mingw-w64-ucrt-x86_64-rustup
+            mingw-w64-ucrt-x86_64-gmp
+            mingw-w64-ucrt-x86_64-zlib
+      - name: Install Rust nightly
+        shell: msys2 {0}
+        run: |
+          rustup toolchain install nightly
+          rustup default nightly
+      - name: Build crate
+        shell: msys2 {0}
+        run: |
+          if [ -f "$HOME/.cargo/env" ]; then
+            source "$HOME/.cargo/env"
+          fi
+          cargo build --locked
+
+  openbsd:
+    name: OpenBSD 7.5
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Build inside OpenBSD VM
+        uses: vmactions/openbsd-vm@v1
+        with:
+          release: '7.5'
+          run: |
+            export PKG_PATH=https://cdn.openbsd.org/pub/OpenBSD/7.5/packages/amd64/
+            pkg_add git rust gmake gmp
+            ln -sf /usr/local/bin/gmake /usr/local/bin/make
+            cd /workdir
+            cargo build --locked
